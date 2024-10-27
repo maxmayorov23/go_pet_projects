@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode"
 )
 
 func checkString(s string) (bool, error) {
@@ -91,21 +93,98 @@ func checkString(s string) (bool, error) {
   return true, nil
 }
 
-func main () {
 
-	var task, unwanted string
-	fmt.Println("Enter a string without spaces to calculate: ")
-	fmt.Scanf("%s %s", &task, &unwanted)
-	
-	if (unwanted != "") {
-		fmt.Printf("\n%s\n", "Do not use spaces when entering a task!")
-		return
+func calculate(nums []float64, ops []rune) ([]float64, []rune) {
+	// Достаём последнее число и оператор
+	right := nums[len(nums)-1]
+	left := nums[len(nums)-2]
+	op := ops[len(ops)-1]
+
+	// Убираем их из стека
+	nums = nums[:len(nums)-2]
+	ops = ops[:len(ops)-1]
+
+	var result float64
+	switch op {
+	case '+':
+		result = left + right
+	case '-':
+		result = left - right
+	case '*':
+		result = left * right
+	case '/':
+		if right == 0 {
+			panic("деление на ноль")
+		}
+		result = left / right
 	}
 
-	_, err := checkString(task)
-	if err != nil {
-		fmt.Printf("\n%s\n", err)
-		return
-	}
+	// Возвращаем результат в стек чисел
+	nums = append(nums, result)
+	return nums, ops
 }
 
+func precedence(op rune) int {
+	if op == '+' || op == '-' {
+		return 1
+	}
+	if op == '*' || op == '/' {
+		return 2
+	}
+	return 0
+}
+
+func Calc(expression string) (float64, error) {
+
+	_, err := checkString(expression)
+	if err != nil {
+		return 0, fmt.Errorf("%s",err) 
+	}
+    
+	nums := []float64{}
+	ops := []rune{}
+	i := 0
+
+	for i < len(expression) {
+		
+		ch := rune(expression[i])
+
+		if unicode.IsDigit(ch) {
+			j := i
+			for j < len(expression) && unicode.IsDigit(rune(expression[j])) {
+				j++
+			}
+			num, _ := strconv.ParseFloat(expression[i:j], 64)
+
+			nums = append(nums, num)  // Добавлено число в стек
+			i = j - 1
+
+		} else if ch == '(' { 
+		
+			ops = append(ops, ch)
+
+		} else if ch == ')' {
+		
+
+			for len(ops) > 0 && ops[len(ops)-1] != '(' {
+				nums, ops = calculate(nums, ops)
+			}
+			ops = ops[:len(ops)-1]
+
+		} else if ch == '+' || ch == '-' || ch == '*' || ch == '/' {
+
+			for len(ops) > 0 && precedence(ops[len(ops)-1]) >= precedence(ch) {
+				nums, ops = calculate(nums, ops)
+			}
+			ops = append(ops, ch)
+		}
+		i++
+	}
+
+	// Выполняем оставшиеся операции
+	for len(ops) > 0 {
+		nums, ops = calculate(nums, ops)
+	}
+
+	return nums[0], nil
+}
